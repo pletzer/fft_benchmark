@@ -82,13 +82,19 @@ elseif(FFT_BACKEND STREQUAL "MKL")
   set(FFT_BACKEND_NAME "Intel MKL (FFTW3 interface)")
 
 elseif(FFT_BACKEND STREQUAL "AOCL")
+  # EasyBuild sets EBROOT<NAME> for whatever AOCL-FFTW module is loaded
+  # (e.g. "AOCL-min-FFTW" -> EBROOTAOCLMINFFTW); fall back to that if
+  # AOCL_ROOT/AOCLFFT_ROOT weren't set explicitly.
   if(DEFINED ENV{AOCL_ROOT})
     set(AOCL_ROOT_DIR $ENV{AOCL_ROOT})
   elseif(DEFINED ENV{AOCLFFT_ROOT})
     set(AOCL_ROOT_DIR $ENV{AOCLFFT_ROOT})
+  elseif(DEFINED ENV{EBROOTAOCLMINFFTW})
+    set(AOCL_ROOT_DIR $ENV{EBROOTAOCLMINFFTW})
   else()
-    message(FATAL_ERROR "AOCL_ROOT (or AOCLFFT_ROOT) is not set. Point it at your "
-                         "AOCL / amd-fftw installation (the one shipping fftw3.f03).")
+    message(FATAL_ERROR "AOCL_ROOT (or AOCLFFT_ROOT / EBROOTAOCLMINFFTW) is not set. "
+                         "Point it at your AOCL / amd-fftw installation (the one "
+                         "shipping fftw3.f03), or load the AOCL-min-FFTW module.")
   endif()
 
   find_path(FFT_INCLUDE_DIRS fftw3.f03
