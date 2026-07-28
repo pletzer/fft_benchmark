@@ -6,7 +6,7 @@
 ! CMake was configured with (-DFFT_BACKEND=FFTW|MKL|AOCL).
 !
 ! Usage:
-!   fft3d_bench N1 [N2 N3 ...] [--repeat=R] [--estimate]
+!   fft3d_bench N1 [N2 N3 ...] [--repeat=R] [--estimate] [--csv]
 !
 !   N1 N2 ...   one or more grid sizes; each produces an N x N x N complex
 !               grid (same size in all three dimensions).
@@ -15,6 +15,10 @@
 !   --estimate  use FFTW_ESTIMATE for planning instead of the default
 !               FFTW_MEASURE (faster to plan, less representative of the
 !               library's best achievable performance).
+!   --csv       machine-readable output: one CSV header line followed by
+!               one data line per size (backend,plan,N,repeat,time_ms,
+!               gflops,roundtrip_err), no banner/table formatting. Meant
+!               for feeding a plotting/analysis script.
 program fft3d_bench
   use, intrinsic :: iso_c_binding
   use fft_config, only: backend_name
@@ -25,34 +29,39 @@ program fft3d_bench
 
   integer, allocatable :: sizes(:)
   integer :: nsizes, repeat_count, isz
-  logical :: use_estimate
+  logical :: use_estimate, use_csv
 
-  call parse_args(sizes, nsizes, repeat_count, use_estimate)
+  call parse_args(sizes, nsizes, repeat_count, use_estimate, use_csv)
 
   if (nsizes == 0) then
-    print '(A)', "Usage: fft3d_bench N1 [N2 N3 ...] [--repeat=R] [--estimate]"
+    print '(A)', "Usage: fft3d_bench N1 [N2 N3 ...] [--repeat=R] [--estimate] [--csv]"
     stop 1
   end if
 
-  print '(A)', "================================================================"
-  print '(A,A)',   " 3D FFT benchmark  —  backend: ", trim(backend_name)
-  print '(A,I0)',  " repeats per size (min of)   : ", repeat_count
-  print '(A,A)',   " planning mode                : ", &
-       merge("FFTW_ESTIMATE", "FFTW_MEASURE ", use_estimate)
-  print '(A)', "================================================================"
-  print '(A)', ""
-  print '(A8,A14,A14,A16,A14)', "N", "time(ms)", "GFLOP/s", "roundtrip err", "N^3 (Mi elem)"
+  if (use_csv) then
+    print '(A)', "backend,plan,N,repeat,time_ms,gflops,roundtrip_err"
+  else
+    print '(A)', "================================================================"
+    print '(A,A)',   " 3D FFT benchmark  —  backend: ", trim(backend_name)
+    print '(A,I0)',  " repeats per size (min of)   : ", repeat_count
+    print '(A,A)',   " planning mode                : ", &
+         merge("FFTW_ESTIMATE", "FFTW_MEASURE ", use_estimate)
+    print '(A)', "================================================================"
+    print '(A)', ""
+    print '(A8,A14,A14,A16,A14)', "N", "time(ms)", "GFLOP/s", "roundtrip err", "N^3 (Mi elem)"
+  end if
 
   do isz = 1, nsizes
-    call run_case(sizes(isz), repeat_count, use_estimate)
+    call run_case(sizes(isz), repeat_count, use_estimate, use_csv)
   end do
 
 contains
 
-  subroutine run_case(n, nrep, estimate)
+  subroutine run_case(n, nrep, estimate, csv)
     integer, intent(in) :: n
     integer, intent(in) :: nrep
     logical, intent(in) :: estimate
+    logical, intent(in) :: csv
 
     integer(C_SIZE_T) :: ntot
     integer :: plan_flags, r
@@ -105,8 +114,14 @@ contains
     flop_estimate = 5.0_dp * real(ntot, dp) * log(real(ntot, dp)) / log(2.0_dp)
     gflops = flop_estimate / (best * 1.0e9_dp)
 
-    print '(I8,F14.4,F14.3,ES16.3,F14.2)', &
-         n, best * 1.0e3_dp, gflops, err, real(ntot, dp) / 1048576.0_dp
+    if (csv) then
+      write(*, '(A,",",A,",",I0,",",I0,",",F0.6,",",F0.6,",",ES0.6)') &
+           trim(backend_name), trim(merge("estimate", "measure ", estimate)), &
+           n, nrep, best * 1.0e3_dp, gflops, err
+    else
+      print '(I8,F14.4,F14.3,ES16.3,F14.2)', &
+           n, best * 1.0e3_dp, gflops, err, real(ntot, dp) / 1048576.0_dp
+    end if
 
     call fftw_destroy_plan(plan_fwd)
     call fftw_destroy_plan(plan_bwd)
@@ -136,17 +151,19 @@ contains
     end do
   end subroutine init_signal
 
-  subroutine parse_args(out_sizes, out_n, out_repeat, out_estimate)
+  subroutine parse_args(out_sizes, out_n, out_repeat, out_estimate, out_csv)
     integer, allocatable, intent(out) :: out_sizes(:)
     integer, intent(out) :: out_n
     integer, intent(out) :: out_repeat
     logical, intent(out) :: out_estimate
+    logical, intent(out) :: out_csv
 
     integer :: nargs, i, ios, val, count_numeric
     character(len=256) :: arg
 
     out_repeat = 5
     out_estimate = .false.
+    out_csv = .false.
     nargs = command_argument_count()
 
     count_numeric = 0
@@ -163,6 +180,8 @@ contains
       arg = trim(arg)
       if (arg == "--estimate") then
         out_estimate = .true.
+      else if (arg == "--csv") then
+        out_csv = .true.
       else if (len(arg) > 9 .and. arg(1:9) == "--repeat=") then
         read(arg(10:), *, iostat=ios) val
         if (ios /= 0 .or. val < 1) then
