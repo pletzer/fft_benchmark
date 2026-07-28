@@ -75,8 +75,10 @@ elseif(FFT_BACKEND STREQUAL "MKL")
     message(FATAL_ERROR "Could not find MKL's fftw3.f03 / libmkl_rt under MKLROOT=${MKLROOT_DIR}")
   endif()
 
-  find_package(Threads REQUIRED)
-  set(FFT_LIBRARIES ${MKL_RT_LIBRARY} Threads::Threads ${CMAKE_DL_LIBS} m)
+  # Not using find_package(Threads) here: it requires a C/CXX compiler to be
+  # enabled, and this is a Fortran-only project. Link pthread/dl/m directly,
+  # as Intel's MKL Link Line Advisor recommends for libmkl_rt.
+  set(FFT_LIBRARIES ${MKL_RT_LIBRARY} pthread ${CMAKE_DL_LIBS} m)
   set(FFT_BACKEND_NAME "Intel MKL (FFTW3 interface)")
 
 elseif(FFT_BACKEND STREQUAL "AOCL")
