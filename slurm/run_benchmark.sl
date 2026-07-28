@@ -21,7 +21,11 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Submit this from the repo root (`sbatch slurm/run_benchmark.sl`). Slurm
+# runs batch scripts from a copy under its spool directory, so deriving the
+# repo location from ${BASH_SOURCE[0]} resolves to the wrong place -- use
+# SLURM_SUBMIT_DIR (the directory `sbatch` was invoked from) instead.
+REPO_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
 SIZES=(32 64 128 256 512)
 REPEAT=10
 
