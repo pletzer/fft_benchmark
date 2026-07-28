@@ -16,21 +16,24 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# Fixed colors so a given backend always gets the same color across plots.
-COLORS = {
-    "FFTW3": "#1b9e77",
-    "Intel MKL (FFTW3 interface)": "#d95f02",
-    "AOCL-FFT (amd-fftw, FFTW3 interface)": "#7570b3",
-}
-MARKERS = {
-    "FFTW3": "o",
-    "Intel MKL (FFTW3 interface)": "s",
-    "AOCL-FFT (amd-fftw, FFTW3 interface)": "^",
+# Canonical short legend label + styling, keyed by the exact backend_name
+# string baked into each build via CMake's FFT_BACKEND_NAME (see
+# CMakeLists.txt). Using a fixed short label here -- rather than deriving
+# one from the raw string -- keeps the legend unambiguous even if those
+# descriptive strings change.
+BACKEND_STYLE = {
+    "FFTW3": {"label": "FFTW", "color": "#1b9e77", "marker": "o"},
+    "Intel MKL (FFTW3 interface)": {"label": "MKL", "color": "#d95f02", "marker": "s"},
+    "AOCL-FFT (amd-fftw)": {"label": "AOCL", "color": "#7570b3", "marker": "^"},
 }
 
 
-def short_name(backend):
-    return backend.split(" (")[0]
+def style_for(backend):
+    if backend in BACKEND_STYLE:
+        return BACKEND_STYLE[backend]
+    # Unrecognized backend string (e.g. FFT_BACKEND_NAME was changed) --
+    # fall back to a short label instead of crashing.
+    return {"label": backend.split(" (")[0], "color": None, "marker": "o"}
 
 
 def load_results(results_dir):
@@ -54,11 +57,11 @@ def plot(data, out_path):
 
     for backend in backends:
         sub = data[data["backend"] == backend]
-        color = COLORS.get(backend, None)
-        marker = MARKERS.get(backend, "o")
-        label = short_name(backend)
-        ax_gflops.plot(sub["N"], sub["gflops"], marker=marker, color=color, label=label)
-        ax_time.plot(sub["N"], sub["time_ms"], marker=marker, color=color, label=label)
+        style = style_for(backend)
+        ax_gflops.plot(sub["N"], sub["gflops"], marker=style["marker"],
+                        color=style["color"], label=style["label"])
+        ax_time.plot(sub["N"], sub["time_ms"], marker=style["marker"],
+                     color=style["color"], label=style["label"])
 
     ax_gflops.set_xscale("log", base=2)
     ax_gflops.set_xlabel("Grid size N (N x N x N)")

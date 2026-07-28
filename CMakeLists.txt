@@ -107,7 +107,9 @@ elseif(FFT_BACKEND STREQUAL "AOCL")
                          "AOCL_ROOT=${AOCL_ROOT_DIR}. AOCL ships this as amd-fftw; "
                          "adjust the HINTS above to match your install layout if needed.")
   endif()
-  set(FFT_BACKEND_NAME "AOCL-FFT (amd-fftw, FFTW3 interface)")
+  # No comma here: this string is written verbatim as a CSV field by
+  # fft3d_bench --csv, and the writer doesn't quote fields.
+  set(FFT_BACKEND_NAME "AOCL-FFT (amd-fftw)")
 
 else()
   message(FATAL_ERROR "Unknown FFT_BACKEND '${FFT_BACKEND}'. Use FFTW, MKL, or AOCL.")

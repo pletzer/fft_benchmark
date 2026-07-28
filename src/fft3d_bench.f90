@@ -115,9 +115,16 @@ contains
     gflops = flop_estimate / (best * 1.0e9_dp)
 
     if (csv) then
-      write(*, '(A,",",A,",",I0,",",I0,",",F0.6,",",F0.6,",",ES0.6)') &
-           trim(backend_name), trim(merge("estimate", "measure ", estimate)), &
-           n, nrep, best * 1.0e3_dp, gflops, err
+      ! Quote the two string fields: they're baked-in descriptive text
+      ! (see FFT_BACKEND_NAME in CMakeLists.txt) that could contain a comma,
+      ! and this writer does no other escaping.
+      block
+        character(len=:), allocatable :: backend_q, plan_q
+        backend_q = '"' // trim(backend_name) // '"'
+        plan_q = '"' // trim(merge("estimate", "measure ", estimate)) // '"'
+        write(*, '(A,",",A,",",I0,",",I0,",",F0.6,",",F0.6,",",ES0.6)') &
+             backend_q, plan_q, n, nrep, best * 1.0e3_dp, gflops, err
+      end block
     else
       print '(I8,F14.4,F14.3,ES16.3,F14.2)', &
            n, best * 1.0e3_dp, gflops, err, real(ntot, dp) / 1048576.0_dp
